@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# coding=utf-8
 import os.path
 import sys
 from my_parser import MyParser
@@ -28,7 +29,10 @@ if __name__ == '__main__':
         [Command Argument Commands]\n\
         -help\t: prints out help for the program\n\
         -print\t: prints out parse tree\n\
-        -time\t: times how long parsing takes\n')
+        -time\t: times how long parsing takes\n\
+        \n\
+        This program was written primarily for Python 3.9.1 64-bit.\n\
+        It is not guarenteed to work on any other version.\n')
         sys.exit()
     if ('-print' in sys.argv):
         print_tree = True
@@ -60,6 +64,10 @@ if __name__ == '__main__':
 
     if (output != None):
         print ('Finished parsing with no errors')
+        # print output
+        print ('Printing generated output:')
+        for node in output:
+            print (node)
 
 
     
