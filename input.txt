@@ -1,0 +1,6 @@
+begin
+w := 123;
+x := w + 2300;
+qwe2345 := (345 + x) * x * x;
+qwe := 4 + x + x + (5 * 5) mod 23435 div 3
+end
