@@ -1,0 +1,13 @@
+Test cases provides to us from eCampus
+
+1 (test program with errors):
+begin
+A := C + 2B ** 2 M;
+end
+
+2 (test program):
+begin
+ANSWER := 42;
+BETA := ALPHA + 2 * GAMMA div (C3P0 - R2D2);
+A := B + C * D div E mod F - H ^ 2 ^ I ^ SHOOT;
+end

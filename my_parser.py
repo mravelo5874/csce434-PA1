@@ -198,15 +198,6 @@ class MyParser:
 
         if (len(id_found) == 0):
             raise ParseError(self.pos, self.lines, 'Missing id')
-
-        # # if 'must_exist' is true, check to see if id exists
-        # if (must_exist):
-        #     if (id_found not in self.ids):
-        #         raise ParseError(self.pos, self.lines, 'Invaid id (id \'%s\' has not been declared)' % id_found)
-        # # else if id does not exist, add to id array
-        # else:
-        #     if (id_found not in self.ids):
-        #         self.ids.append(id_found)
         
         # ensure chars in id are allowed:
         # '<id> represents any valid sequence of characters and digits starting with a character'
@@ -279,8 +270,14 @@ class MyParser:
         for error in self.errors:
             if (error.pos == max_pos):
                 errors.append(error)
+        
+        # remove any duplicate errors
+        res = [] 
+        for error in errors: 
+            if (error not in res):
+                res.append(error) 
 
-        return errors
+        return res
 
     def add_output(self, instruction):
         id = self.output_id
@@ -323,6 +320,7 @@ class MyParser:
         try:
             self.program()
         except ParseError as error:
+            # print error(s) to user
             errors = self.determine_errors()
             if (len(errors) > 0):
                 count = 0
@@ -462,35 +460,33 @@ class MyParser:
     def factor(self):
         self.pretty_print('factor', True)
         prev_pos = self.pos
-        output_ids = []
+        oi = []
         try:
-            print ('1: ', output_ids)
-            output_ids.extend(self.primary())
-            print ('2: ', output_ids)
+            oi.extend(self.primary())
             self.match('^', KeywordType.OPERATOR)
-            output_ids.extend(self.factor())
-            output_ids.append(self.add_output('POW')) # add to stack machine output
+            oi.extend(self.factor())
+            oi.append(self.add_output('POW')) # add to stack machine output
 
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
             # remove outputs and clear array
-            self.remove_outputs(output_ids)
-            output_ids.clear()
+            self.remove_outputs(oi)
+            oi.clear()
             try:
                 self.pos = prev_pos
-                output_ids.extend(self.primary())
+                oi.extend(self.primary())
                 
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
                 # remove outputs and clear array
-                self.remove_outputs(output_ids)
-                output_ids.clear()
+                self.remove_outputs(oi)
+                oi.clear()
                 raise error2
 
         self.pretty_print('factor', False)
-        return output_ids
+        return oi
 
     # primary -> id
     #          | num
@@ -498,44 +494,44 @@ class MyParser:
     def primary(self):
         self.pretty_print('primary', True)
         prev_pos = self.pos
-        output_ids = []
+        oi = []
         try:
             id = self.get_id(True)
-            output_ids.append(self.add_output('RVALUE %s' % id)) # add to stack machine output
+            oi.append(self.add_output('RVALUE %s' % id)) # add to stack machine output
 
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
             # remove outputs and clear array
-            self.remove_outputs(output_ids)
-            output_ids.clear()
+            self.remove_outputs(oi)
+            oi.clear()
             try:
                 self.pos = prev_pos
                 num = self.get_number()
-                output_ids.append(self.add_output('PUSH %s' % num)) # add to stack machine output
+                oi.append(self.add_output('PUSH %s' % num)) # add to stack machine output
 
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
                 # remove outputs and clear array
-                self.remove_outputs(output_ids)
-                output_ids.clear()
+                self.remove_outputs(oi)
+                oi.clear()
                 try:
                     self.pos = prev_pos
                     self.match('(', KeywordType.PARENTHESIS)
-                    output_ids.append(self.expr())
+                    oi.extend(self.expr())
                     self.match(')', KeywordType.PARENTHESIS)
 
                 except ParseError as error3:
                     # add error to list
                     self.errors.append(error3)
                     # remove outputs and clear array
-                    self.remove_outputs(output_ids)
-                    output_ids.clear()
+                    self.remove_outputs(oi)
+                    oi.clear()
                     raise error3
 
         self.pretty_print('primary', False)
-        return output_ids
+        return oi
 
     # stmt_list' -> ; stmt stmt_list'
     #             | ϵ

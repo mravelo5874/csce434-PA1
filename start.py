@@ -63,9 +63,9 @@ if __name__ == '__main__':
     output = parser.parse(lines)
 
     if (output != None):
-        print ('Finished parsing with no errors')
+        print ('Finished parsing with no errors.')
         # print output
-        print ('Printing generated output:')
+        print ('\nPrinting generated output:')
         for node in output:
             print (node)
 
