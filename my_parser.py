@@ -61,12 +61,19 @@ class KeywordType(enum.Enum):
     PARENTHESIS = 4
     STMT_TERMINATOR = 5
 
+class ParseErrorType(enum.Enum):
+    INVALID_CHAR = 1
+    INVALID_ID = 2
+    EXPECTED_KEYWORD = 3
+    EXPECTED_NUM = 4
+
 # accepts text position and formats an error message for the parser
 class ParseError(Exception):
-    def __init__(self, pos, lines, msg):
+    def __init__(self, pos, lines, msg, error_type):
         self.pos = pos
         self.lines = lines
         self.msg = msg
+        self.error_type = error_type
         
     def __str__(self):
         sum = 0
@@ -78,8 +85,11 @@ class ParseError(Exception):
         # print ('sum: %i, count: %i, pos: %i' % (sum, count, self.pos))
         line_num = count
         pos_num = self.pos - sum + 1
+        spaces = ''
+        for i in range(pos_num - 1):
+            spaces += ' '
 
-        return 'ParseError: %s at line %s pos %s' % (self.msg, line_num, pos_num)
+        return 'ParseError[%s]: %s at line %s pos %s:\n%s%s^\n' % (self.error_type.name, self.msg, line_num, pos_num, self.lines[line_num - 1], spaces)
 
 # class that stores output string and id
 class OutputNode():
@@ -175,7 +185,7 @@ class MyParser:
         for char in word_found:
             index += 1
             if (char not in valid_chars):
-                raise ParseError(self.pos + index, self.lines, 'Invaild word (%s)' % word_found)
+                raise ParseError(self.pos + index, self.lines, 'Invaild character (%s)' % char, ParseErrorType.INVALID_CHAR)
         
         self.pretty_print_tabs('word found: %s' % word_found)
         return word_found
@@ -188,7 +198,7 @@ class MyParser:
             self.pretty_print_tabs('matched: %s' % keyword)
             return
 
-        raise ParseError(self.pos, self.lines, 'Expected keyword of type \'%s\' but found \'%s\'' % (keyword_type.name, word))
+        raise ParseError(self.pos, self.lines, 'Expected keyword of type \'%s\' but found \'%s\'' % (keyword_type.name, word), ParseErrorType.EXPECTED_KEYWORD)
 
     # attempts to find and return an id
     def get_id(self, must_exist):
@@ -197,16 +207,16 @@ class MyParser:
         id_found = self.get_next_word()
 
         if (len(id_found) == 0):
-            raise ParseError(self.pos, self.lines, 'Missing id')
+            raise ParseError(self.pos, self.lines, 'Invalid id (missing id)', ParseErrorType.INVALID_ID)
         
         # ensure chars in id are allowed:
         # '<id> represents any valid sequence of characters and digits starting with a character'
         if (id_found[0] not in alpha_chars):
-            raise ParseError(self.pos, self.lines, 'Invalid id (must start with character)')
+            raise ParseError(self.pos, self.lines, 'Invalid id (must start with character)', ParseErrorType.INVALID_ID)
             
         for i in range(1, len(id_found) - 1):
             if (id_found[i] not in alphaNums_chars):
-                raise ParseError(self.pos + i, self.lines, 'Invaild id (invaild char -> %s)' % id_found[i])
+                raise ParseError(self.pos + i, self.lines, 'Invaild id (invaild char -> %s)' % id_found[i], ParseErrorType.INVALID_ID)
         
         self.pos += len(id_found)
         self.pretty_print_tabs("id found: %s" % id_found)
@@ -218,11 +228,11 @@ class MyParser:
 
         num_found = self.get_next_word()
         if (num_found == ''):
-            raise ParseError(self.pos, self.lines, 'Expected number character (empty number)')
+            raise ParseError(self.pos, self.lines, 'Expected number character (empty number)', ParseErrorType.EXPECTED_NUM)
 
         for num in num_found:
             if (num not in nums_chars):
-                raise ParseError(self.pos, self.lines, 'Expected number character (invalid number -> %s)' % num)
+                raise ParseError(self.pos, self.lines, 'Expected number character (invalid number -> %s)' % num, ParseErrorType.EXPECTED_NUM)
         
         self.pos += len(num_found)
         self.pretty_print_tabs("number found: %s" % num_found)
@@ -272,10 +282,12 @@ class MyParser:
                 errors.append(error)
         
         # remove any duplicate errors
-        res = [] 
+        res = []
+        used_types = []
         for error in errors: 
-            if (error not in res):
-                res.append(error) 
+            if (error.error_type not in used_types):
+                used_types.append(error.error_type)
+                res.append(error)
 
         return res
 
@@ -292,6 +304,10 @@ class MyParser:
                     self.output.remove(node)
                     break
         return
+
+    def get_last_output(self):
+        if (len(self.output) > 0):
+            return self.output[-1]
 
 
     # --------------------------------
@@ -324,7 +340,7 @@ class MyParser:
             errors = self.determine_errors()
             if (len(errors) > 0):
                 count = 0
-                print ('Possible Errors:')
+                print ('\nPossible Errors:')
                 for error in errors:
                     print ('%i %s' % (count, error))
                     count += 1
@@ -361,7 +377,7 @@ class MyParser:
         output_ids = []
         try:
             id = self.get_id(False)
-            output_ids.append(self.add_output('LVALUE %s' % id)) # add to stack machine output
+            output_ids.append(self.add_output('LVALUE\t%s' % id)) # add to stack machine output
             self.match(':=', KeywordType.ASSIGNMENT)
             output_ids.extend(self.expr())
             output_ids.extend(self.stmt_list_prime())
@@ -396,7 +412,7 @@ class MyParser:
         output_ids = []
         try:
             id = self.get_id(False)
-            output_ids.append(self.add_output('LVALUE %s' % id)) # add to stack machine output
+            output_ids.append(self.add_output('LVALUE\t%s' % id)) # add to stack machine output
             self.match(':=', KeywordType.ASSIGNMENT)
             output_ids.extend(self.expr())
 
@@ -410,7 +426,7 @@ class MyParser:
             self.pos = prev_pos
             word = self.get_next_word()
             if (word != 'end'):
-                raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
+                raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word, ParseErrorType.EXPECTED_KEYWORD)
             self.pretty_print_tabs('ϵ')
 
         self.pretty_print('stmt', False)
@@ -497,7 +513,7 @@ class MyParser:
         oi = []
         try:
             id = self.get_id(True)
-            oi.append(self.add_output('RVALUE %s' % id)) # add to stack machine output
+            oi.append(self.add_output('RVALUE\t%s' % id)) # add to stack machine output
 
         except ParseError as error1:
             # add error to list
@@ -508,7 +524,7 @@ class MyParser:
             try:
                 self.pos = prev_pos
                 num = self.get_number()
-                oi.append(self.add_output('PUSH %s' % num)) # add to stack machine output
+                oi.append(self.add_output('PUSH\t%s' % num)) # add to stack machine output
 
             except ParseError as error2:
                 # add error to list
@@ -541,7 +557,8 @@ class MyParser:
         output_ids = []
         try:
             self.match(';', KeywordType.STMT_TERMINATOR)
-            output_ids.append(self.add_output('STO1')) # add to stack machine output
+            output_ids.append(self.add_output('STO')) # add to stack machine output
+            print ('sto')
             output_ids.extend(self.stmt())
             output_ids.extend(self.stmt_list_prime())
 
@@ -555,8 +572,11 @@ class MyParser:
             self.pos = prev_pos
             word = self.get_next_word()
             if (word != 'end'):
-                raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
+                raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word, ParseErrorType.EXPECTED_KEYWORD)
             self.pretty_print_tabs('ϵ')
+            # add last STO if not already added to output
+            if (self.get_last_output().string != 'STO'):
+                output_ids.append(self.add_output('STO')) # add to stack machine output
 
         self.pretty_print('stmt_list_prime', False)
         return output_ids
@@ -598,7 +618,7 @@ class MyParser:
                 self.pos = prev_pos
                 word = self.get_next_word()
                 if (word == ';'):
-                    raise ParseError(self.pos, self.lines, 'Expected character \';\' but found \'%s\'' % word)
+                    raise ParseError(self.pos, self.lines, 'Expected keyword \';\' but found \'%s\'' % word, ParseErrorType.EXPECTED_KEYWORD)
                 self.pretty_print_tabs('ϵ')
 
         self.pretty_print('expr_prime', False)
@@ -654,7 +674,7 @@ class MyParser:
                     self.pos = prev_pos
                     next_word = self.get_next_word()
                     if (next_word not in '+-' and next_word != 'end'):
-                        raise ParseError (self.pos, self.lines, 'Expected character ( + | - | end )')
+                        raise ParseError (self.pos, self.lines, 'Expected keyword ( + | - | end )', ParseErrorType.EXPECTED_KEYWORD)
                     self.pretty_print_tabs('ϵ')
 
         self.pretty_print('term_prime', False)

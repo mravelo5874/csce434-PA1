@@ -9,7 +9,7 @@ from my_parser import ParseError
 #   Marco Ravelo
 #   CSCE 434 - Compiler Design
 #   Assignment #1 - 2/2/2021 
-#   file: main.py
+#   file: satrt.py
 # --------------------------------
 
 # Resources used:
@@ -17,7 +17,6 @@ from my_parser import ParseError
 # - https://cyberzhg.github.io/toolbox/left_rec
 
 if __name__ == '__main__':
-
     # command line arguments
     print_tree = False
     time_parse = False
@@ -41,7 +40,7 @@ if __name__ == '__main__':
 
     while (True):
         # prompt user for input file name
-        input_file = input ('Input file name [Default input.txt]: ')
+        input_file = input ('Input file name [Press \'Enter\' to user default - input.txt]: ')
 
         # check if blank, change to default
         if (input_file == ''):
