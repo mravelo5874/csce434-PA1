@@ -107,7 +107,6 @@ class MyParser:
         self.print_tree = print_tree
         self.time = time_parse
         self.errors = []
-        self.ids = []
         
 
     # --------------------------------
@@ -200,14 +199,14 @@ class MyParser:
         if (len(id_found) == 0):
             raise ParseError(self.pos, self.lines, 'Missing id')
 
-        # if 'must_exist' is true, check to see if id exists
-        if (must_exist):
-            if (id_found not in self.ids):
-                raise ParseError(self.pos, self.lines, 'Invaid id (id \'%s\' has not been declared)' % id_found)
-        # else if id does not exist, add to id array
-        else:
-            if (id_found not in self.ids):
-                self.ids.append(id_found)
+        # # if 'must_exist' is true, check to see if id exists
+        # if (must_exist):
+        #     if (id_found not in self.ids):
+        #         raise ParseError(self.pos, self.lines, 'Invaid id (id \'%s\' has not been declared)' % id_found)
+        # # else if id does not exist, add to id array
+        # else:
+        #     if (id_found not in self.ids):
+        #         self.ids.append(id_found)
         
         # ensure chars in id are allowed:
         # '<id> represents any valid sequence of characters and digits starting with a character'
@@ -448,8 +447,8 @@ class MyParser:
         try:
             self.primary()
             self.match('^', KeywordType.OPERATOR)
-            output_ids.append(self.add_output('POW')) # add to stack machine output
             self.factor()
+            output_ids.append(self.add_output('POW')) # add to stack machine output
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -525,6 +524,7 @@ class MyParser:
             if (word != 'end'):
                 raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
             self.pretty_print_tabs('ϵ')
+            output_ids.append(self.add_output('STO')) # add to stack machine output
         self.pretty_print('stmt_list_prime', False)
         return
 
@@ -537,9 +537,9 @@ class MyParser:
         output_ids = []
         try:
             self.match('+', KeywordType.OPERATOR)
-            output_ids.append(self.add_output('ADD')) # add to stack machine output
             self.term()
             self.expr_prime()
+            output_ids.append(self.add_output('ADD')) # add to stack machine output
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -550,9 +550,9 @@ class MyParser:
             try:
                 self.pos = prev_pos
                 self.match('-', KeywordType.OPERATOR)
-                output_ids.append(self.add_output('SUB')) # add to stack machine output
                 self.term()
                 self.expr_prime()
+                output_ids.append(self.add_output('SUB')) # add to stack machine output
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
@@ -578,8 +578,8 @@ class MyParser:
         output_ids = []
         try:
             self.match('*', KeywordType.OPERATOR)
-            output_ids.append(self.add_output('MPY')) # add to stack machine output
             self.factor()
+            output_ids.append(self.add_output('MPY')) # add to stack machine output
             self.term_prime()
         except ParseError as error1:
             # add error to list
@@ -590,8 +590,8 @@ class MyParser:
             self.pos = prev_pos
             try:
                 self.match('div', KeywordType.OPERATOR)
-                output_ids.append(self.add_output('DIV')) # add to stack machine output
                 self.factor()
+                output_ids.append(self.add_output('DIV')) # add to stack machine output
                 self.term_prime()
             except ParseError as error2:
                 # add error to list
@@ -602,9 +602,9 @@ class MyParser:
                 self.pos = prev_pos
                 try:
                     self.match('mod', KeywordType.OPERATOR)
-                    output_ids.append(self.add_output('MOD')) # add to stack machine output
                     self.factor()
                     self.term_prime()
+                    output_ids.append(self.add_output('MOD')) # add to stack machine output
                 except ParseError as error3:
                     # add error to list
                     self.errors.append(error3)
@@ -614,8 +614,8 @@ class MyParser:
                     # check to see if term' = ϵ
                     self.pos = prev_pos
                     next_word = self.get_next_word()
-                    if (next_word not in '+-;'):
-                        raise ParseError (self.pos, self.lines, 'Expected character ( + | - | ; )')
+                    if (next_word not in '+-' and next_word != 'end'):
+                        raise ParseError (self.pos, self.lines, 'Expected character ( + | - | end )')
                     self.pretty_print_tabs('ϵ')
         self.pretty_print('term_prime', False)
         return
