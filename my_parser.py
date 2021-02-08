@@ -285,15 +285,13 @@ class MyParser:
     def add_output(self, instruction):
         id = self.output_id
         self.output.append(OutputNode(instruction, id))
-        print ('adding to output: %i %s' % (id, instruction))
         self.output_id += 1
         return id
 
-    def remove_outputs(self, ids):
+    def remove_outputs(self, ids=[]):
         for id in ids:
             for node in self.output:
                 if (node.id == id):
-                    print ('removing from output: %i %s' % (node.id, node.string))
                     self.output.remove(node)
                     break
         return
@@ -315,7 +313,6 @@ class MyParser:
         self.output_id = 0
         self.tabs = 0
         self.errors = []
-        self.ids = []
 
         # time parse
         if (self.time):
@@ -344,12 +341,11 @@ class MyParser:
 
         return self.output
 
-    #    program -> begin stmt_list end
+    # program -> begin stmt_list end
     def program(self):
         self.pretty_print('program', True)
         try:
             self.match('begin', KeywordType.PRGRM_KEYWORD)
-            self.add_output('START') # add to stack machine output
             self.stmt_list()
             self.match('end', KeywordType.PRGRM_KEYWORD)
             self.add_output('HALT') # add to stack machine output
@@ -359,8 +355,8 @@ class MyParser:
         self.pretty_print('program', False)
         return
     
-    #  stmt_list -> id := expr stmt_list'
-    #             | stmt_list'
+    # stmt_list -> id := expr stmt_list'
+    #            | stmt_list'
     def stmt_list(self):
         self.pretty_print('stmt_list', True)
         prev_pos = self.pos
@@ -369,8 +365,9 @@ class MyParser:
             id = self.get_id(False)
             output_ids.append(self.add_output('LVALUE %s' % id)) # add to stack machine output
             self.match(':=', KeywordType.ASSIGNMENT)
-            self.expr()
-            self.stmt_list_prime()
+            output_ids.extend(self.expr())
+            output_ids.extend(self.stmt_list_prime())
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -380,15 +377,21 @@ class MyParser:
             # try next
             try: 
                 self.pos = prev_pos
-                self.expr_prime()
+                output_ids.append(self.expr_prime())
+
             except ParseError as error2:
+                # add error to list
                 self.errors.append(error2)
+                # remove outputs and clear array
+                self.remove_outputs(output_ids)
+                output_ids.clear()
                 raise error2
+
         self.pretty_print('stmt_list', False)
-        return
+        return output_ids
     
-    #       stmt -> id := expr
-    #             | ϵ
+    # stmt -> id := expr
+    #       | ϵ
     def stmt(self):
         self.pretty_print('stmt', True)
         prev_pos = self.pos
@@ -397,7 +400,8 @@ class MyParser:
             id = self.get_id(False)
             output_ids.append(self.add_output('LVALUE %s' % id)) # add to stack machine output
             self.match(':=', KeywordType.ASSIGNMENT)
-            self.expr()
+            output_ids.extend(self.expr())
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -410,45 +414,63 @@ class MyParser:
             if (word != 'end'):
                 raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
             self.pretty_print_tabs('ϵ')
+
         self.pretty_print('stmt', False)
-        return
+        return output_ids
     
-    #       expr -> term expr'
+    # expr -> term expr'
     def expr(self):
         self.pretty_print('expr', True)
+        output_ids = []
         try:
-            self.term()
-            self.expr_prime()
+            output_ids.extend(self.term())
+            output_ids.extend(self.expr_prime())
+
         except ParseError as error1:
+            # add error to list
             self.errors.append(error1)
+            # remove outputs and clear array
+            self.remove_outputs(output_ids)
+            output_ids.clear()
             raise error1
+
         self.pretty_print('expr', False)
-        return
+        return output_ids
 
     #       term -> factor term'
     def term(self):
         self.pretty_print('term', True)
+        output_ids = []
         try:
-            self.factor()
-            self.term_prime()
+            output_ids.extend(self.factor())
+            output_ids.extend(self.term_prime())
+
         except ParseError as error1:
+            # add error to list
             self.errors.append(error1)
+            # remove outputs and clear array
+            self.remove_outputs(output_ids)
+            output_ids.clear()
             raise error1
+
         self.pretty_print('term', False)
-        return
+        return output_ids
 
         
-    #     factor -> primary ^ factor
-    #             | primary
+    # factor -> primary ^ factor
+    #         | primary
     def factor(self):
         self.pretty_print('factor', True)
         prev_pos = self.pos
         output_ids = []
         try:
-            self.primary()
+            print ('1: ', output_ids)
+            output_ids.extend(self.primary())
+            print ('2: ', output_ids)
             self.match('^', KeywordType.OPERATOR)
-            self.factor()
+            output_ids.extend(self.factor())
             output_ids.append(self.add_output('POW')) # add to stack machine output
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -457,16 +479,22 @@ class MyParser:
             output_ids.clear()
             try:
                 self.pos = prev_pos
-                self.primary()
+                output_ids.extend(self.primary())
+                
             except ParseError as error2:
+                # add error to list
                 self.errors.append(error2)
+                # remove outputs and clear array
+                self.remove_outputs(output_ids)
+                output_ids.clear()
                 raise error2
-        self.pretty_print('factor', False)
-        return
 
-    #    primary -> id
-    #             | num
-    #             | ( expr )
+        self.pretty_print('factor', False)
+        return output_ids
+
+    # primary -> id
+    #          | num
+    #          | ( expr )
     def primary(self):
         self.pretty_print('primary', True)
         prev_pos = self.pos
@@ -474,6 +502,7 @@ class MyParser:
         try:
             id = self.get_id(True)
             output_ids.append(self.add_output('RVALUE %s' % id)) # add to stack machine output
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -484,6 +513,7 @@ class MyParser:
                 self.pos = prev_pos
                 num = self.get_number()
                 output_ids.append(self.add_output('PUSH %s' % num)) # add to stack machine output
+
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
@@ -493,13 +523,19 @@ class MyParser:
                 try:
                     self.pos = prev_pos
                     self.match('(', KeywordType.PARENTHESIS)
-                    self.expr()
+                    output_ids.append(self.expr())
                     self.match(')', KeywordType.PARENTHESIS)
+
                 except ParseError as error3:
+                    # add error to list
                     self.errors.append(error3)
+                    # remove outputs and clear array
+                    self.remove_outputs(output_ids)
+                    output_ids.clear()
                     raise error3
+
         self.pretty_print('primary', False)
-        return
+        return output_ids
 
     # stmt_list' -> ; stmt stmt_list'
     #             | ϵ
@@ -510,8 +546,9 @@ class MyParser:
         try:
             self.match(';', KeywordType.STMT_TERMINATOR)
             output_ids.append(self.add_output('STO')) # add to stack machine output
-            self.stmt()
-            self.stmt_list_prime()
+            output_ids.extend(self.stmt())
+            output_ids.extend(self.stmt_list_prime())
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -525,21 +562,23 @@ class MyParser:
                 raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
             self.pretty_print_tabs('ϵ')
             output_ids.append(self.add_output('STO')) # add to stack machine output
-        self.pretty_print('stmt_list_prime', False)
-        return
 
-    #      expr' -> + term expr'
-    #             | - term expr'
-    #             | ϵ
+        self.pretty_print('stmt_list_prime', False)
+        return output_ids
+
+    # expr' -> + term expr'
+    #        | - term expr'
+    #        | ϵ
     def expr_prime(self):
         self.pretty_print('expr_prime', True)
         prev_pos = self.pos
         output_ids = []
         try:
             self.match('+', KeywordType.OPERATOR)
-            self.term()
-            self.expr_prime()
+            output_ids.extend(self.term())
+            output_ids.extend(self.expr_prime())
             output_ids.append(self.add_output('ADD')) # add to stack machine output
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -550,9 +589,10 @@ class MyParser:
             try:
                 self.pos = prev_pos
                 self.match('-', KeywordType.OPERATOR)
-                self.term()
-                self.expr_prime()
+                output_ids.extend(self.term())
+                output_ids.extend(self.expr_prime())
                 output_ids.append(self.add_output('SUB')) # add to stack machine output
+
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
@@ -565,22 +605,24 @@ class MyParser:
                 if (word == ';'):
                     raise ParseError(self.pos, self.lines, 'Expected character \';\' but found \'%s\'' % word)
                 self.pretty_print_tabs('ϵ')
-        self.pretty_print('expr_prime', False)
-        return
 
-    #      term' -> * factor term'
-    #             | / factor term'
-    #             | mod factor term'
-    #             | ϵ
+        self.pretty_print('expr_prime', False)
+        return output_ids
+
+    # term' -> * factor term'
+    #        | div factor term'
+    #        | mod factor term'
+    #        | ϵ
     def term_prime(self):
         self.pretty_print('term_prime', True)
         prev_pos = self.pos
         output_ids = []
         try:
             self.match('*', KeywordType.OPERATOR)
-            self.factor()
+            output_ids.extend(self.factor())
             output_ids.append(self.add_output('MPY')) # add to stack machine output
-            self.term_prime()
+            output_ids.extend(self.term_prime())
+
         except ParseError as error1:
             # add error to list
             self.errors.append(error1)
@@ -590,9 +632,10 @@ class MyParser:
             self.pos = prev_pos
             try:
                 self.match('div', KeywordType.OPERATOR)
-                self.factor()
+                output_ids.extend(self.factor())
                 output_ids.append(self.add_output('DIV')) # add to stack machine output
-                self.term_prime()
+                output_ids.extend(self.term_prime())
+
             except ParseError as error2:
                 # add error to list
                 self.errors.append(error2)
@@ -602,9 +645,10 @@ class MyParser:
                 self.pos = prev_pos
                 try:
                     self.match('mod', KeywordType.OPERATOR)
-                    self.factor()
-                    self.term_prime()
+                    output_ids.extend(self.factor())
                     output_ids.append(self.add_output('MOD')) # add to stack machine output
+                    output_ids.extend(self.term_prime())
+                    
                 except ParseError as error3:
                     # add error to list
                     self.errors.append(error3)
@@ -617,5 +661,6 @@ class MyParser:
                     if (next_word not in '+-' and next_word != 'end'):
                         raise ParseError (self.pos, self.lines, 'Expected character ( + | - | end )')
                     self.pretty_print_tabs('ϵ')
+
         self.pretty_print('term_prime', False)
-        return
+        return output_ids
