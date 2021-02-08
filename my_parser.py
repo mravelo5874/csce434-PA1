@@ -541,7 +541,7 @@ class MyParser:
         output_ids = []
         try:
             self.match(';', KeywordType.STMT_TERMINATOR)
-            output_ids.append(self.add_output('STO')) # add to stack machine output
+            output_ids.append(self.add_output('STO1')) # add to stack machine output
             output_ids.extend(self.stmt())
             output_ids.extend(self.stmt_list_prime())
 
@@ -557,7 +557,6 @@ class MyParser:
             if (word != 'end'):
                 raise ParseError(self.pos, self.lines, 'Expected keyword \'end\' but found \'%s\'' % word)
             self.pretty_print_tabs('ϵ')
-            output_ids.append(self.add_output('STO')) # add to stack machine output
 
         self.pretty_print('stmt_list_prime', False)
         return output_ids
